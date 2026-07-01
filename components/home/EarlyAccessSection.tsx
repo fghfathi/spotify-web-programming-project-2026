@@ -31,6 +31,7 @@ export default function EarlyAccessSection({ items }: EarlyAccessSectionProps) {
               subtitle={item.artistName}
               coverImageUrl={item.coverImageUrl}
               badge="Early"
+              artistId={item.artistId}
             />
           ))}
         </div>

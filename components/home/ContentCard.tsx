@@ -1,8 +1,11 @@
+import Link from "next/link";
+
 interface ContentCardProps {
     title: string;
     subtitle: string;
     coverImageUrl?: string;
     badge?: string;
+    artistId?: string;
   }
   
   // Generic card used for playlists, albums, songs, and early-access items.
@@ -12,6 +15,7 @@ interface ContentCardProps {
     subtitle,
     coverImageUrl,
     badge,
+    artistId,
   }: ContentCardProps) {
     return (
       <div className="group w-40 shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 transition hover:border-zinc-600 hover:bg-zinc-800/80 sm:w-44">
@@ -40,7 +44,16 @@ interface ContentCardProps {
         </div>
   
         <p className="truncate text-sm font-medium text-white">{title}</p>
-        <p className="truncate text-xs text-zinc-400">{subtitle}</p>
+        {artistId ? (
+          <Link
+            href={`/artist/${artistId}`}
+            className="block truncate text-xs text-zinc-400 hover:text-white hover:underline"
+          >
+            {subtitle}
+          </Link>
+        ) : (
+          <p className="truncate text-xs text-zinc-400">{subtitle}</p>
+        )}
       </div>
     );
   }

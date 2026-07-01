@@ -20,6 +20,7 @@ export interface Playlist {
 export interface Album {
   id: string;
   title: string;
+  artistId: string;
   artistName: string;
   coverImageUrl?: string;
   releaseDate: string; // ISO date string
@@ -28,6 +29,7 @@ export interface Album {
 export interface Song {
   id: string;
   title: string;
+  artistId: string;
   artistName: string;
   coverImageUrl?: string;
   playsCount: number;
@@ -36,6 +38,7 @@ export interface Song {
 export interface EarlyAccessItem {
   id: string;
   title: string;
+  artistId: string;
   artistName: string;
   coverImageUrl?: string;
   unlockDate: string; // ISO date string

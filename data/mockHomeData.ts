@@ -28,40 +28,45 @@ import {
     {
       id: "al_1",
       title: "Neon Hours",
+      artistId: "art_1",
       artistName: "Marlow",
       releaseDate: "2026-06-12",
     },
     {
       id: "al_2",
       title: "Static Bloom",
+      artistId: "art_2",
       artistName: "Aviary",
       releaseDate: "2026-06-20",
     },
     {
       id: "al_3",
       title: "Glass City",
+      artistId: "art_3",
       artistName: "Ren Vale",
       releaseDate: "2026-06-25",
     },
   ];
   
   export const mockPopularSongs: Song[] = [
-    { id: "sg_1", title: "Midnight Static", artistName: "Marlow", playsCount: 184_200 },
-    { id: "sg_2", title: "Open Roads", artistName: "Aviary", playsCount: 152_900 },
-    { id: "sg_3", title: "Slow Burn", artistName: "Ren Vale", playsCount: 121_400 },
-    { id: "sg_4", title: "Paper Moon", artistName: "Juno Ray", playsCount: 98_700 },
+    { id: "sg_1", title: "Midnight Static", artistId: "art_1", artistName: "Marlow", playsCount: 184_200 },
+    { id: "sg_2", title: "Open Roads", artistId: "art_2", artistName: "Aviary", playsCount: 152_900 },
+    { id: "sg_3", title: "Slow Burn", artistId: "art_3", artistName: "Ren Vale", playsCount: 121_400 },
+    { id: "sg_4", title: "Paper Moon", artistId: "art_4", artistName: "Juno Ray", playsCount: 98_700 },
   ];
   
   export const mockEarlyAccess: EarlyAccessItem[] = [
     {
       id: "ea_1",
       title: "Hourglass (Unreleased)",
+      artistId: "art_1",
       artistName: "Marlow",
       unlockDate: "2026-07-04",
     },
     {
       id: "ea_2",
       title: "Drift",
+      artistId: "art_2",
       artistName: "Aviary",
       unlockDate: "2026-07-08",
     },

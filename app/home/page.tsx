@@ -50,6 +50,7 @@ export default function HomePage() {
                 title={album.title}
                 subtitle={album.artistName}
                 coverImageUrl={album.coverImageUrl}
+                artistId={album.artistId}
               />
             ))}
           </ContentSection>
@@ -64,6 +65,7 @@ export default function HomePage() {
                 title={song.title}
                 subtitle={song.artistName}
                 coverImageUrl={song.coverImageUrl}
+                artistId={song.artistId}
               />
             ))}
           </ContentSection>
