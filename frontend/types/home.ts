@@ -1,16 +1,24 @@
-// frontend/types/home.ts
+// Shared domain types for the Home Page feature.
+// Kept framework-agnostic so they can later map 1:1 to Django REST responses.
 
 export type SubscriptionTier = "free" | "gold";
-
-// 1. Add UserRole to support Section 2.6 requirements
-export type UserRole = "listener" | "artist" | "admin" | "support";
+export type UserRole = "listener" | "artist" | "support" | "admin";
 
 export interface User {
   id: string;
   displayName: string;
-  profileImageUrl?: string;
+  profileImageUrl?: string; // optional -> fallback avatar is used when missing
   subscription: SubscriptionTier;
-  role: UserRole; // Added for role-based logic (Notifications, etc.)
+  role: UserRole; // drives which nav items (e.g. Artist Panel) are visible
+}
+
+export interface Song {
+  id: string;
+  title: string;
+  artistId: string;
+  artistName: string;
+  coverImageUrl?: string;
+  playsCount: number;
 }
 
 export interface Playlist {
@@ -18,7 +26,7 @@ export interface Playlist {
   title: string;
   coverImageUrl?: string;
   trackCount: number;
-  songs?: Song[]; // Added to store added songs in Phase 1
+  songs?: Song[]; // optional -> only populated for playlists with tracks already added
 }
 
 export interface Album {
@@ -27,7 +35,7 @@ export interface Album {
   artistId: string;
   artistName: string;
   coverImageUrl?: string;
-  releaseDate: string;
+  releaseDate: string; // ISO date string
 }
 
 export interface Song {
@@ -45,16 +53,39 @@ export interface EarlyAccessItem {
   artistId: string;
   artistName: string;
   coverImageUrl?: string;
-  unlockDate: string;
+  unlockDate: string; // ISO date string
 }
 
-// 2. Add "/notifications" to NavRoute
-export type NavRoute = "/playlists" | "/profile" | "/settings" | "/albums" | "/notifications";
+export type NavRoute =
+  | "/playlists"
+  | "/profile"
+  | "/settings"
+  | "/albums"
+  | "/notifications"
+  | "/artist/dashboard"
+  | "/support/users"
+  | "/support/artists"
+  | "/support/tickets"
+  | "/support/stats"
+  | "/support/finance"
+  | "/support/subscriptions";
 
-// 3. Add "notifications" to icon types
 export interface NavItem {
-  label: string;
-  route: NavRoute;
-  icon: "playlist" | "profile" | "settings" | "albums" | "notifications";
+    label: string;
+    route: NavRoute;
+    icon:
+      | "playlist"
+      | "profile"
+      | "settings"
+      | "albums"
+      | "notifications"
+      | "artist"
+      | "manageUsers"
+      | "manageArtists"
+      | "tickets"
+      | "stats"
+      | "finance"
+      | "subscriptions";
+    roles?: UserRole[];
 }
 

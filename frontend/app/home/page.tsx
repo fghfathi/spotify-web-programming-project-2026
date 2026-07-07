@@ -18,9 +18,15 @@ import {
 export default function HomePage() {
   const isGoldMember = mockUser.subscription === "gold";
 
+  // Nav items with a `roles` restriction only render for users whose role
+  // is included in that list; items with no `roles` are shown to everyone.
+  const visibleNavItems = sidebarNavItems.filter(
+    (item) => !item.roles || item.roles.includes(mockUser.role)
+  );
+
   return (
     <div className="flex min-h-screen flex-col bg-black md:flex-row">
-      <Sidebar navItems={sidebarNavItems} />
+      <Sidebar navItems={visibleNavItems} />
 
       <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
         <TopBar user={mockUser} />

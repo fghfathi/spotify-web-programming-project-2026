@@ -2,21 +2,30 @@
 // of truth for Home Page content until the Django API is wired up.
 
 import {
-    Album,
-    EarlyAccessItem,
-    NavItem,
-    Playlist,
-    Song,
-    User,
-  } from "@/types/home";
+  Album,
+  EarlyAccessItem,
+  NavItem,
+  Playlist,
+  Song,
+  User,
+  UserRole,
+} from "@/types/home";
+
+// ===========================================================================
+// CENTRAL ROLE SWITCH 
+// Change this ONE value to instantly test each role's sidebar + pages:
+// "listener" | "artist" | "support" | "admin"
+// ===========================================================================
   
-  export const mockUser: User = {
-    id: "u_001",
-    displayName: "Alex Rivera",
-    profileImageUrl: undefined,
-    subscription: "gold",
-    role: "listener", // Default role for testing Phase 1 notifications
-  };
+export const ACTIVE_ROLE: UserRole = "admin";
+
+export const mockUser: User = {
+  id: "u_001",
+  displayName: "Alex Rivera",
+  profileImageUrl: undefined,
+  subscription: "gold",
+  role: ACTIVE_ROLE, 
+};
   
   export const mockRecentPlaylists: Playlist[] = [
     { id: "pl_1", title: "Late Night Drive", trackCount: 18 },
@@ -78,7 +87,14 @@ import {
     { label: "Profile", route: "/profile", icon: "profile" },
     { label: "Settings", route: "/settings", icon: "settings" },
     { label: "Albums & Singles", route: "/albums", icon: "albums" },
-    { label: "Notifications", route: "/notifications", icon: "notifications" }, // Check this line
+    { label: "Notifications", route: "/notifications", icon: "notifications" },
+    { label: "Artist Panel", route: "/artist/dashboard", icon: "artist", roles: ["artist"] },
+    { label: "Manage Users", route: "/support/users", icon: "manageUsers", roles: ["support", "admin"] },
+    { label: "Manage Artists", route: "/support/artists", icon: "manageArtists", roles: ["support", "admin"] },
+    { label: "Support Tickets", route: "/support/tickets", icon: "tickets", roles: ["support", "admin"] },
+    { label: "Platform Stats", route: "/support/stats", icon: "stats", roles: ["support", "admin"] },
+    { label: "Finance & Auditing", route: "/support/finance", icon: "finance", roles: ["support", "admin"] },
+    { label: "Subscription Settings", route: "/support/subscriptions", icon: "subscriptions", roles: ["admin"] },
   ];
   
   
