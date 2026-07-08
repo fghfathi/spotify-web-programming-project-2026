@@ -1,0 +1,110 @@
+// Mock data for Phase 1. No backend calls — this file is the single source
+// of truth for Home Page content until the Django API is wired up.
+
+import {
+  Album,
+  EarlyAccessItem,
+  NavItem,
+  Playlist,
+  Song,
+  User,
+  UserRole,
+} from "@/types/home";
+
+// ===========================================================================
+// CENTRAL ROLE SWITCH 
+// Change this ONE value to instantly test each role's sidebar + pages:
+// "listener" | "artist" | "support" | "admin"
+// ===========================================================================
+  
+export const ACTIVE_ROLE: UserRole = "admin";
+
+export const mockUser: User = {
+  id: "u_001",
+  displayName: "Alex Rivera",
+  profileImageUrl: undefined,
+  subscription: "gold",
+  role: ACTIVE_ROLE, 
+};
+  
+  export const mockRecentPlaylists: Playlist[] = [
+    { id: "pl_1", title: "Late Night Drive", trackCount: 18 },
+    { id: "pl_2", title: "Focus Flow", trackCount: 24 },
+    { id: "pl_3", title: "Throwback Hits", trackCount: 32 },
+    { id: "pl_4", title: "Chill Acoustic", trackCount: 15 },
+  ];
+  
+  export const mockRecentAlbums: Album[] = [
+    {
+      id: "al_1",
+      title: "Neon Hours",
+      artistId: "art_1",
+      artistName: "Marlow",
+      releaseDate: "2026-06-12",
+    },
+    {
+      id: "al_2",
+      title: "Static Bloom",
+      artistId: "art_2",
+      artistName: "Aviary",
+      releaseDate: "2026-06-20",
+    },
+    {
+      id: "al_3",
+      title: "Glass City",
+      artistId: "art_3",
+      artistName: "Ren Vale",
+      releaseDate: "2026-06-25",
+    },
+  ];
+  
+  export const mockPopularSongs: Song[] = [
+    { id: "sg_1", title: "Midnight Static", artistId: "art_1", artistName: "Marlow", playsCount: 184_200 },
+    { id: "sg_2", title: "Open Roads", artistId: "art_2", artistName: "Aviary", playsCount: 152_900 },
+    { id: "sg_3", title: "Slow Burn", artistId: "art_3", artistName: "Ren Vale", playsCount: 121_400 },
+    { id: "sg_4", title: "Paper Moon", artistId: "art_4", artistName: "Juno Ray", playsCount: 98_700 },
+  ];
+  
+  export const mockEarlyAccess: EarlyAccessItem[] = [
+    {
+      id: "ea_1",
+      title: "Hourglass (Unreleased)",
+      artistId: "art_1",
+      artistName: "Marlow",
+      unlockDate: "2026-07-04",
+    },
+    {
+      id: "ea_2",
+      title: "Drift",
+      artistId: "art_2",
+      artistName: "Aviary",
+      unlockDate: "2026-07-08",
+    },
+  ];
+
+  export const sidebarNavItems: NavItem[] = [
+    { label: "Playlists", route: "/playlists", icon: "playlist" },
+    { label: "Profile", route: "/profile", icon: "profile" },
+    { label: "Settings", route: "/settings", icon: "settings" },
+    { label: "Albums & Singles", route: "/albums", icon: "albums" },
+    { label: "Notifications", route: "/notifications", icon: "notifications" },
+    { label: "Artist Panel", route: "/artist/dashboard", icon: "artist", roles: ["artist"] },
+    { label: "Manage Users", route: "/support/users", icon: "manageUsers", roles: ["support", "admin"] },
+    { label: "Manage Artists", route: "/support/artists", icon: "manageArtists", roles: ["support", "admin"] },
+    { label: "Support Tickets", route: "/support/tickets", icon: "tickets", roles: ["support", "admin"] },
+    { label: "Platform Stats", route: "/support/stats", icon: "stats", roles: ["support", "admin"] },
+    { label: "Finance & Auditing", route: "/support/finance", icon: "finance", roles: ["support", "admin"] },
+    { label: "Subscription Settings", route: "/support/subscriptions", icon: "subscriptions", roles: ["admin"] },
+  ];
+  
+  
+export const SUBSCRIPTION_LIMITS: Record<string, number> = {
+  base: 6,
+  silver: 100,
+  gold: Infinity,
+};
+
+// Initial playlists for testing (can be empty to test Empty State)
+export const initialPlaylists: Playlist[] = [
+  { id: "pl_1", title: "My First Jam", trackCount: 0, songs: [] },
+];

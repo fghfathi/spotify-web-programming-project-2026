@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(dataviz)",
+      "Skill(dataviz:*)",
+      "Bash(node /private/tmp/claude-501/bundled-skills/2.1.202/27c10f24e7909aa771fe0ca127a1e9ce/dataviz/scripts/validate_palette.js --help)",
+      "Bash(node /private/tmp/claude-501/bundled-skills/2.1.202/27c10f24e7909aa771fe0ca127a1e9ce/dataviz/scripts/validate_palette.js '#1db954,#93a7c9,#f5b014' --mode dark --surface '#141414')",
+      "Bash(node /private/tmp/claude-501/bundled-skills/2.1.202/27c10f24e7909aa771fe0ca127a1e9ce/dataviz/scripts/validate_palette.js '#1db954,#a9bcd9,#f0a91b' --mode dark --surface '#141414')",
+      "Bash(node /private/tmp/claude-501/bundled-skills/2.1.202/27c10f24e7909aa771fe0ca127a1e9ce/dataviz/scripts/validate_palette.js '#1db954,#93a7c9,#f5b014' --mode light)"
+    ]
+  }
+}
