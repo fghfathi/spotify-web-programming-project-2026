@@ -30,6 +30,8 @@ build/
 # misc
 .DS_Store
 *.pem
+.claude/
+.DS_Store
 
 # debug
 npm-debug.log*
