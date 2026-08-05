@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import SettingsCard from "./SettingsCard";
-import Modal from "./Modal";
 import { SubscriptionType } from "@/types/profile";
 import { SUBSCRIPTION_LABELS } from "@/data/mockSettingsData";
 
@@ -19,8 +18,6 @@ const BADGE_STYLES: Record<SubscriptionType, string> = {
 export default function SubscriptionSection({
   subscription,
 }: SubscriptionSectionProps) {
-  const [showUpgrade, setShowUpgrade] = useState(false);
-
   return (
     <SettingsCard
       title="Subscription"
@@ -33,33 +30,14 @@ export default function SubscriptionSection({
           {SUBSCRIPTION_LABELS[subscription]}
         </span>
 
-        <button
-          type="button"
-          onClick={() => setShowUpgrade(true)}
+        {/* Links to the real checkout flow (Step 6). */}
+        <Link
+          href="/subscription"
           className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-zinc-200"
         >
           Upgrade / change plan
-        </button>
+        </Link>
       </div>
-
-      <Modal
-        open={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        title="Coming soon"
-      >
-        <p>
-          Payment and subscription upgrades will be implemented in Phase 2.
-          Your current plan stays active until then.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setShowUpgrade(false)}
-          className="mt-5 w-full rounded-lg bg-white py-2.5 font-semibold text-black"
-        >
-          Got it
-        </button>
-      </Modal>
     </SettingsCard>
   );
 }

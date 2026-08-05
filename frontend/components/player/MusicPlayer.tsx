@@ -5,9 +5,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMusicPlayer } from "@/context/MusicPlayerContext";
+import { useAuth } from "@/context/AuthContext";
 import { RepeatMode } from "@/types/player";
 import { Song } from "@/types/music";
-import { mockUser } from "@/data/mockHomeData";
 import ProgressBar from "./ProgressBar";
 import QueuePanel from "./QueuePanel";
 import LyricsPanel from "./LyricsPanel";
@@ -147,15 +147,14 @@ export default function MusicPlayer() {
     toggleLyricsPanel,
   } = useMusicPlayer();
 
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
 
   // No track loaded yet: render nothing rather than an empty bar.
   if (!currentSong) return null;
 
-  // Phase 1 mock: gold-tier perk shown next to the play count.
-  // Assumes "gold" maps to mockUser.subscription, matching the rest of the
-  // app (home.ts/profile.ts use subscription tiers, not a "gold" role).
-  const isGoldMember = mockUser.subscription === "gold";
+  // Gold-tier perk shown next to the play count, driven by the real session.
+  const isGoldMember = user?.subscription === "gold";
 
   return (
     <>

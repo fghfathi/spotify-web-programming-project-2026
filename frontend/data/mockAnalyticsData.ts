@@ -34,7 +34,7 @@ export const TIER_COLORS = {
 // Static Phase-1 baselines for the previous month, used only to compute the
 // month-over-month growth/comparison indicators.
 const LAST_MONTH_REVENUE = 3120.75;
-const LAST_MONTH_PAYING_USERS = 548;
+const LAST_MONTH_PAYING_USERS: number = 548;
 
 // Month-over-month change, rounded to one decimal place.
 function pctChange(current: number, previous: number): number {

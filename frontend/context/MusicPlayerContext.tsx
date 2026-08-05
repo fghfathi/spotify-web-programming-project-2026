@@ -17,6 +17,16 @@ import {
 } from "react";
 import { Song } from "@/types/music";
 import { RepeatMode } from "@/types/player";
+import { apiPost } from "@/lib/api";
+
+// Fire-and-forget: tell the backend a track started so it records a stream
+// event (feeding plays_count and artist analytics). Failures are ignored so
+// playback is never blocked by analytics.
+function recordStreamPlay(songId: string) {
+  const numericId = Number(songId);
+  if (!Number.isFinite(numericId)) return;
+  apiPost(`/songs/${numericId}/play/`).catch(() => {});
+}
 
 interface MusicPlayerContextValue {
   currentSong: Song | null;
@@ -102,6 +112,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         // Autoplay can be blocked by the browser; UI still reflects intent.
       });
       setIsPlaying(true);
+      recordStreamPlay(song.id);
     } else {
       // Phase 1 mock songs may not have a real audio source. Keep the UI
       // functional (track "selected") without pretending audio is playing.

@@ -1,30 +1,66 @@
-import { notFound } from "next/navigation";
+"use client";
+
+// Artist profile page — backed by the API (Bug 1). Fetches /api/artists/<id>/
+// and renders the profile, Gold-only stats, and combined releases.
+
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import VerifiedBadge from "@/components/artist/VerifiedBadge";
 import ArtistFollowButton from "@/components/artist/ArtistFollowButton";
 import ArtistStats from "@/components/artist/ArtistStats";
 import ArtistReleasesSection from "@/components/artist/ArtistReleasesSection";
-import { mockArtists, mockFollowedArtistIds } from "@/data/mockArtistData";
-import { mockUser } from "@/data/mockHomeData";
+import RouteGuard from "@/components/shared/RouteGuard";
+import { LoadingState, ErrorState } from "@/components/shared/UIStates";
+import { useAuth } from "@/context/AuthContext";
+import { apiGet } from "@/lib/api";
+import { Artist } from "@/types/artist";
 
-interface ArtistProfilePageProps {
-  params: Promise<{ id: string }>;
+interface ArtistDetail extends Artist {
+  isFollowedByCurrentUser: boolean;
 }
 
-// Phase 1: artist + follow data is mocked. Replace the lookups below with
-// API calls (e.g. fetch from Django REST endpoints) once the backend phase
-// begins — the component tree below does not need to change.
-export default async function ArtistProfilePage({
-  params,
-}: ArtistProfilePageProps) {
-  const { id } = await params;
-  const artist = mockArtists[id];
+function ArtistProfileContent() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
+  const { user } = useAuth();
+  const [artist, setArtist] = useState<ArtistDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  if (!artist) {
-    notFound();
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await apiGet<ArtistDetail>(`/artists/${Number(id)}/`);
+      setArtist(data);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black">
+        <LoadingState label="Loading artist…" />
+      </div>
+    );
+  }
+  if (error || !artist) {
+    return (
+      <div className="min-h-screen bg-black">
+        <ErrorState message="This artist could not be found." onRetry={load} />
+      </div>
+    );
   }
 
-  const isGoldMember = mockUser.subscription === "gold";
-  const isFollowing = mockFollowedArtistIds.includes(artist.id);
+  const isGoldMember = user?.subscription === "gold";
 
   return (
     <main className="min-h-screen bg-black px-4 py-8 md:px-10">
@@ -41,8 +77,9 @@ export default async function ArtistProfilePage({
           </div>
 
           <ArtistFollowButton
+            artistId={String(artist.id)}
             artistName={artist.name}
-            initialIsFollowing={isFollowing}
+            initialIsFollowing={artist.isFollowedByCurrentUser}
           />
         </div>
 
@@ -56,5 +93,13 @@ export default async function ArtistProfilePage({
         <ArtistReleasesSection releases={artist.releases} />
       </div>
     </main>
+  );
+}
+
+export default function ArtistProfilePage() {
+  return (
+    <RouteGuard>
+      <ArtistProfileContent />
+    </RouteGuard>
   );
 }

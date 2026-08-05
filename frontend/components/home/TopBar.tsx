@@ -1,4 +1,8 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { User } from "@/types/home";
+import { useAuth } from "@/context/AuthContext";
 
 interface TopBarProps {
   user: User;
@@ -18,6 +22,14 @@ function FallbackAvatar({ name }: { name: string }) {
 }
 
 export default function TopBar({ user }: TopBarProps) {
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.replace("/");
+  };
+
   return (
     <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-4 py-4 backdrop-blur md:px-8">
       <div>
@@ -35,7 +47,7 @@ export default function TopBar({ user }: TopBarProps) {
         )}
 
         {user.profileImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- mock data may use arbitrary external URLs
+          // eslint-disable-next-line @next/next/no-img-element -- media URLs come from the API host
           <img
             src={user.profileImageUrl}
             alt={`${user.displayName}'s profile picture`}
@@ -44,6 +56,14 @@ export default function TopBar({ user }: TopBarProps) {
         ) : (
           <FallbackAvatar name={user.displayName} />
         )}
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-white"
+        >
+          Log out
+        </button>
       </div>
     </header>
   );

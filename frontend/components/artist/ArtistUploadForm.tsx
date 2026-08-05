@@ -3,26 +3,42 @@
 import { useState } from "react";
 import ArtistFileDropzone from "./ArtistFileDropzone";
 import ArtistCollaboratorsInput from "./ArtistCollaboratorsInput";
-import { ArtistTrack, AudioFormat, Collaborator, ReleaseType } from "@/types/artistDashboard";
+import { Collaborator, ReleaseType } from "@/types/artistDashboard";
 import { ARTIST_GENRES } from "@/data/mockArtistDashboardData";
+import { apiUploadWithProgress, ApiError } from "@/lib/api";
 
-const MAX_AUDIO_SIZE_MB = 50;
-const MAX_COVER_SIZE_MB = 5;
-const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac"];
-const ALLOWED_COVER_TYPES = ["image/png", "image/jpeg", "image/webp"];
+// Limits mirror the backend validators (Step 4): audio .mp3/.wav/.m4a up to
+// 20MB, cover .jpg/.jpeg/.png up to 2MB.
+const MAX_AUDIO_SIZE_MB = 20;
+const MAX_COVER_SIZE_MB = 2;
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "m4a"];
+const ALLOWED_COVER_TYPES = ["image/png", "image/jpeg"];
 
 interface ArtistUploadFormProps {
-  onSubmit: (track: ArtistTrack) => void;
+  // Called after a successful upload so the dashboard can refresh its list.
+  onUploaded: () => void;
 }
 
 function getExtension(fileName: string): string {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
-// Phase 1: files are validated and held in memory (object URLs / file names)
-// only — nothing is actually uploaded to a server yet. Phase 2: swap the
-// onSubmit body for a multipart request to the Django upload endpoint.
-export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
+// Reads the audio file's duration (seconds) client-side so the stored
+// metadata matches the file. Resolves 0 if it cannot be determined.
+function readAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(audio.src);
+      resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration) : 0);
+    };
+    audio.onerror = () => resolve(0);
+    audio.src = URL.createObjectURL(file);
+  });
+}
+
+export default function ArtistUploadForm({ onUploaded }: ArtistUploadFormProps) {
   const currentYear = new Date().getFullYear();
 
   const [title, setTitle] = useState("");
@@ -36,18 +52,14 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const validate = (): boolean => {
     const nextErrors: Record<string, string> = {};
 
-    if (!title.trim()) {
-      nextErrors.title = "Track title is required.";
-    }
-
-    if (!genre) {
-      nextErrors.genre = "Please select a genre.";
-    }
-
+    if (!title.trim()) nextErrors.title = "Track title is required.";
+    if (!genre) nextErrors.genre = "Please select a genre.";
     if (!year || year < 1900 || year > currentYear + 1) {
       nextErrors.year = `Enter a valid year between 1900 and ${currentYear + 1}.`;
     }
@@ -57,7 +69,7 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
     } else {
       const extension = getExtension(audioFile.name);
       if (!ALLOWED_AUDIO_EXTENSIONS.includes(extension)) {
-        nextErrors.audio = "Audio must be MP3, WAV, or FLAC.";
+        nextErrors.audio = "Audio must be MP3, WAV, or M4A.";
       } else if (audioFile.size > MAX_AUDIO_SIZE_MB * 1024 * 1024) {
         nextErrors.audio = `Audio file must be under ${MAX_AUDIO_SIZE_MB}MB.`;
       }
@@ -65,7 +77,7 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
 
     if (coverFile) {
       if (!ALLOWED_COVER_TYPES.includes(coverFile.type)) {
-        nextErrors.cover = "Cover image must be PNG, JPEG, or WebP.";
+        nextErrors.cover = "Cover image must be PNG or JPEG.";
       } else if (coverFile.size > MAX_COVER_SIZE_MB * 1024 * 1024) {
         nextErrors.cover = `Cover image must be under ${MAX_COVER_SIZE_MB}MB.`;
       }
@@ -87,30 +99,39 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
     setErrors({});
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSuccessMessage("");
-
     if (!validate() || !audioFile) return;
 
-    const newTrack: ArtistTrack = {
-      id: `trk_${Date.now()}`,
-      title: title.trim(),
-      releaseType,
-      genre,
-      year,
-      lyrics: lyrics.trim(),
-      collaborators,
-      coverImageUrl: coverFile ? URL.createObjectURL(coverFile) : undefined,
-      audioFileName: audioFile.name,
-      audioFormat: getExtension(audioFile.name) as AudioFormat,
-      uploadedAt: new Date().toISOString().slice(0, 10),
-      analytics: { streams: 0, uniqueListeners: 0 },
-    };
+    const duration = await readAudioDuration(audioFile);
 
-    onSubmit(newTrack);
-    setSuccessMessage(`"${newTrack.title}" was uploaded successfully.`);
-    resetForm();
+    const form = new FormData();
+    form.append("title", title.trim());
+    form.append("audio_file", audioFile);
+    if (coverFile) form.append("cover_image", coverFile);
+    form.append("genre", genre);
+    form.append("lyrics", lyrics.trim());
+    form.append("duration_seconds", String(duration));
+    // The backend derives single vs album from album membership; new uploads
+    // are standalone tracks. release_date uses the chosen year.
+    form.append("release_date", `${year}-01-01`);
+
+    setUploading(true);
+    setProgress(0);
+    try {
+      await apiUploadWithProgress("/me/tracks/", form, setProgress, "POST");
+      setSuccessMessage(`"${title.trim()}" was uploaded successfully.`);
+      resetForm();
+      onUploaded();
+    } catch (err) {
+      setErrors({
+        submit:
+          err instanceof ApiError ? err.message : "Upload failed. Try again.",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -128,6 +149,11 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
       {successMessage && (
         <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
           {successMessage}
+        </p>
+      )}
+      {errors.submit && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {errors.submit}
         </p>
       )}
 
@@ -189,16 +215,16 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <ArtistFileDropzone
           label="Audio File"
-          accept=".mp3,.wav,.flac"
-          hint="MP3, WAV, or FLAC — up to 50MB"
+          accept=".mp3,.wav,.m4a"
+          hint="MP3, WAV, or M4A — up to 20MB"
           file={audioFile}
           onFileSelect={setAudioFile}
           error={errors.audio}
         />
         <ArtistFileDropzone
           label="Cover Image (optional)"
-          accept="image/png,image/jpeg,image/webp"
-          hint="PNG, JPEG, or WebP — up to 5MB"
+          accept="image/png,image/jpeg"
+          hint="PNG or JPEG — up to 2MB"
           file={coverFile}
           onFileSelect={setCoverFile}
           error={errors.cover}
@@ -218,11 +244,27 @@ export default function ArtistUploadForm({ onSubmit }: ArtistUploadFormProps) {
 
       <ArtistCollaboratorsInput collaborators={collaborators} onChange={setCollaborators} />
 
+      {uploading && (
+        <div>
+          <div className="mb-1 flex justify-between text-xs text-zinc-400">
+            <span>Uploading…</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <button
         type="submit"
-        className="w-full rounded-lg bg-white py-2.5 font-semibold text-black hover:bg-zinc-200 sm:w-auto sm:px-8"
+        disabled={uploading}
+        className="w-full rounded-lg bg-white py-2.5 font-semibold text-black hover:bg-zinc-200 disabled:opacity-60 sm:w-auto sm:px-8"
       >
-        Publish Release
+        {uploading ? "Publishing…" : "Publish Release"}
       </button>
     </form>
   );

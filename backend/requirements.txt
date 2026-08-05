@@ -1,0 +1,20 @@
+# Core framework — Django 4.2 LTS (compatible with the system Python 3.9).
+Django==4.2.16
+
+# REST API layer.
+djangorestframework==3.15.2
+
+# JWT authentication (access/refresh tokens for the SPA).
+djangorestframework-simplejwt==5.3.1
+
+# Cross-origin access so the Next.js frontend (localhost:3000) can call the API.
+django-cors-headers==4.4.0
+
+# Image handling for ImageField (avatars, covers).
+Pillow==10.4.0
+
+# Load configuration from a .env file.
+python-dotenv==1.0.1
+
+# Server-to-server HTTP calls to the payment gateway (Aqaye Pardakht).
+requests==2.32.3

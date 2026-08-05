@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 import { MusicPlayerProvider } from "@/context/MusicPlayerContext";
 import { CurrentUserProvider } from "@/context/CurrentUserContext";
 import MusicPlayer from "@/components/player/MusicPlayer";
@@ -17,15 +18,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-black">
-        {/* CurrentUserProvider wraps everything so every page — home, artist
-            dashboard, and the whole /support portal — reads the exact same
-            role. This is the fix for the sidebar delay/leakage bugs. */}
-        <CurrentUserProvider>
-          <MusicPlayerProvider>
-            {children}
-            <MusicPlayer />
-          </MusicPlayerProvider>
-        </CurrentUserProvider>
+        {/* AuthProvider is the outermost source of truth for the logged-in
+            user + JWT. CurrentUserProvider derives the role from it so every
+            page — home, artist dashboard, and the whole /support portal —
+            reads the exact same role from the real session. */}
+        <AuthProvider>
+          <CurrentUserProvider>
+            <MusicPlayerProvider>
+              {children}
+              <MusicPlayer />
+            </MusicPlayerProvider>
+          </CurrentUserProvider>
+        </AuthProvider>
       </body>
     </html>
   );
