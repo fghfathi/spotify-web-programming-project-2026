@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import SettingsCard from "./SettingsCard";
-import Modal from "./Modal";
 import { SubscriptionType } from "@/types/profile";
 import { SUBSCRIPTION_LABELS } from "@/data/mockSettingsData";
+import { apiGet } from "@/lib/api";
 
 interface SubscriptionSectionProps {
   subscription: SubscriptionType;
+}
+
+// Shape returned by GET /api/me/subscription/. `subscription` is null whenever
+// the user has no *currently active* entitlement — this covers missing,
+// expired and cancelled subscriptions alike (the backend collapses them all).
+interface ActiveSubscription {
+  endDate: string;
+  isActive: boolean;
+}
+
+interface MySubscriptionResponse {
+  tier: string;
+  subscription: ActiveSubscription | null;
 }
 
 const BADGE_STYLES: Record<SubscriptionType, string> = {
@@ -16,10 +30,35 @@ const BADGE_STYLES: Record<SubscriptionType, string> = {
   normal: "bg-zinc-700/40 text-zinc-300 border-zinc-600/40",
 };
 
+// Render the backend's ISO datetime as an exact YYYY-MM-DD calendar date.
+function formatExpiry(iso: string): string {
+  return iso.slice(0, 10);
+}
+
 export default function SubscriptionSection({
   subscription,
 }: SubscriptionSectionProps) {
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [status, setStatus] = useState<"loading" | "error" | "ready">(
+    "loading"
+  );
+  const [sub, setSub] = useState<ActiveSubscription | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiGet<MySubscriptionResponse>("/me/subscription/");
+        if (cancelled) return;
+        setSub(data.subscription);
+        setStatus("ready");
+      } catch {
+        if (!cancelled) setStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <SettingsCard
@@ -33,33 +72,33 @@ export default function SubscriptionSection({
           {SUBSCRIPTION_LABELS[subscription]}
         </span>
 
-        <button
-          type="button"
-          onClick={() => setShowUpgrade(true)}
+        {/* Links to the real checkout flow (Step 6). */}
+        <Link
+          href="/subscription"
           className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-zinc-200"
         >
           Upgrade / change plan
-        </button>
+        </Link>
       </div>
 
-      <Modal
-        open={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        title="Coming soon"
-      >
-        <p>
-          Payment and subscription upgrades will be implemented in Phase 2.
-          Your current plan stays active until then.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setShowUpgrade(false)}
-          className="mt-5 w-full rounded-lg bg-white py-2.5 font-semibold text-black"
-        >
-          Got it
-        </button>
-      </Modal>
+      {/* Subscription expiry (comes straight from the backend, never computed
+          on the client) with explicit loading / error / no-subscription copy. */}
+      <p className="mt-3 text-sm text-zinc-400" role="status" aria-live="polite">
+        {status === "loading" ? (
+          "Checking your subscription…"
+        ) : status === "error" ? (
+          "Couldn't load your subscription status."
+        ) : sub ? (
+          <>
+            Subscription expires on:{" "}
+            <span className="font-medium text-white">
+              {formatExpiry(sub.endDate)}
+            </span>
+          </>
+        ) : (
+          "You do not currently have an active subscription."
+        )}
+      </p>
     </SettingsCard>
   );
 }

@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Height reserved at the bottom of pages for the fixed music player.
+     0px when no track is loaded; the player sets it to its measured height so
+     page content (e.g. the "Publish Release" button) never hides behind it. */
+  --player-height: 0px;
 }
 
 @theme inline {

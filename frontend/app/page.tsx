@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { ApiError } from "@/lib/api";
 
 type Mode = "login" | "register";
 type Role = "listener" | "artist" | "support" | "admin";
@@ -12,74 +14,119 @@ export default function Home() {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [artistPending, setArtistPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const router = useRouter();
+  const { login, register, isAuthenticated, loading } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // If the user is already signed in, skip the auth screen.
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      router.replace("/home");
+    }
+  }, [loading, isAuthenticated, router]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-  
+    setError(null);
+
     const formData = new FormData(e.currentTarget);
-  
-    const email = formData.get("email") as string;
+    const email = (formData.get("email") as string)?.trim();
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
+    const displayName = (formData.get("displayName") as string) || "";
     const birthdate = formData.get("birthdate") as string;
     const gender = formData.get("gender") as string;
     const privacy = formData.get("privacy");
-  
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-    // password must contain letters and numbers
+    // Password must contain both letters and numbers.
     const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d).+$/;
-  
+
     if (!email || !password) {
-      alert("Please fill all required fields.");
+      setError("Please fill all required fields.");
       return;
     }
-  
     if (!emailRegex.test(email)) {
-      alert("Invalid email format.");
+      setError("Invalid email format.");
       return;
     }
-  
+
+    // --- Login ------------------------------------------------------------
+    if (mode === "login") {
+      setSubmitting(true);
+      try {
+        await login(email, password);
+        router.replace("/home");
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Unable to log in. Please try again."
+        );
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // --- Register ---------------------------------------------------------
+    if (role === "support" || role === "admin") {
+      setError("Staff accounts cannot be self-registered.");
+      return;
+    }
     if (password.length < 8) {
-      alert("Password must be at least 8 characters.");
+      setError("Password must be at least 8 characters.");
       return;
     }
-  
     if (!strongPasswordRegex.test(password)) {
-      alert("Password must contain both letters and numbers.");
+      setError("Password must contain both letters and numbers.");
       return;
     }
-  
-    if (mode === "register" && password !== confirmPassword) {
-      alert("Passwords do not match.");
-      return;
+
+    const isArtist = role === "artist";
+    if (!isArtist) {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      if (!birthdate) {
+        setError("Please enter your birth date.");
+        return;
+      }
+      if (!gender) {
+        setError("Please select your gender.");
+        return;
+      }
+      if (!privacy) {
+        setError("You must accept the Privacy Policy.");
+        return;
+      }
     }
-  
-    if (mode === "register" && !birthdate) {
-      alert("Please enter your birth date.");
-      return;
+
+    // The artist's "artistic name" input reuses the displayName field.
+    const fullName = displayName;
+    setSubmitting(true);
+    try {
+      await register({ email, password, fullName, role });
+      if (isArtist) {
+        // Account created with a pending verification profile.
+        setArtistPending(true);
+      } else {
+        router.replace("/home");
+      }
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Unable to create the account. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
-  
-    if (mode === "register" && !gender) {
-      alert("Please select your gender.");
-      return;
-    }
-  
-    if (mode === "register" && !privacy) {
-      alert("You must accept the Privacy Policy.");
-      return;
-    }
-  
-    if (mode === "register" && role === "artist") {
-      setArtistPending(true);
-      return;
-    }
-  
-    router.push("/home");
   };
-  
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-950 via-black to-zinc-900 px-4 py-8">
       <section className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/80 p-7 shadow-2xl backdrop-blur">
@@ -96,6 +143,7 @@ export default function Home() {
             onClick={() => {
               setMode("login");
               setForgotPassword(false);
+              setError(null);
             }}
             className={`rounded-lg py-2 text-sm font-medium transition ${
               mode === "login"
@@ -111,6 +159,7 @@ export default function Home() {
             onClick={() => {
               setMode("register");
               setForgotPassword(false);
+              setError(null);
             }}
             className={`rounded-lg py-2 text-sm font-medium transition ${
               mode === "register"
@@ -121,6 +170,12 @@ export default function Home() {
             Register
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+            {error}
+          </div>
+        )}
 
         {forgotPassword ? (
           <form className="space-y-4">
@@ -172,11 +227,12 @@ export default function Home() {
             </h2>
 
             <p className="mt-3 text-sm text-zinc-300">
-              Your artist account request has been submitted.
+              Your artist account has been created and is awaiting verification.
             </p>
 
             <p className="mt-1 text-sm text-zinc-400">
-              You cannot log in until an admin approves your account.
+              You can log in now, but some artist features stay locked until an
+              admin verifies your account.
             </p>
 
             <button
@@ -192,9 +248,7 @@ export default function Home() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">
-                Role
-              </label>
+              <label className="mb-2 block text-sm text-zinc-300">Role</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
@@ -224,25 +278,29 @@ export default function Home() {
                 />
 
                 <input
+                  name="displayName"
                   type="text"
                   placeholder="Your artistic name"
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white outline-none focus:border-white"
                 />
 
                 <textarea
+                  name="portfolio"
                   placeholder="Portfolio / Sample works"
                   rows={4}
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white outline-none focus:border-white"
                 />
 
                 <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                  Artist accounts will be marked as pending approval after submission.
+                  Artist accounts will be marked as pending approval after
+                  submission.
                 </p>
               </>
             ) : (
               <>
                 {mode === "register" && (
                   <input
+                    name="displayName"
                     type="text"
                     placeholder="Display name"
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white outline-none focus:border-white"
@@ -318,9 +376,12 @@ export default function Home() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-white py-2.5 font-semibold text-black hover:bg-zinc-200"
+              disabled={submitting}
+              className="w-full rounded-lg bg-white py-2.5 font-semibold text-black hover:bg-zinc-200 disabled:opacity-60"
             >
-              {mode === "login"
+              {submitting
+                ? "Please wait…"
+                : mode === "login"
                 ? "Login"
                 : role === "artist"
                 ? "Submit for review"
@@ -342,8 +403,8 @@ export default function Home() {
             </h2>
 
             <p className="mb-3">
-              Shpotify collects basic account information such as email,
-              display name, and profile data to provide music streaming services.
+              Shpotify collects basic account information such as email, display
+              name, and profile data to provide music streaming services.
             </p>
 
             <p className="mb-3">
@@ -363,4 +424,3 @@ export default function Home() {
     </main>
   );
 }
-

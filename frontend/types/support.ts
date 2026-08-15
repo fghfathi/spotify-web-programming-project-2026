@@ -46,12 +46,8 @@ export interface SupportTicket {
   replies: TicketReply[];
 }
 
-export interface PlatformStats {
-  totalUsers: number;
-  totalArtists: number;
-  activeArtists: number;
-  pendingTickets: number;
-}
+// Platform-wide aggregates now live in types/reports.ts (`SupportReport` /
+// `AdminReport`), because the backend computes them. Nothing here derives them.
 
 export interface ArtistPayout {
   id: string;
@@ -60,17 +56,11 @@ export interface ArtistPayout {
   period: string; // e.g. "2026-07" — the month this payout covers
   uniqueListeners: number;
   totalStreams: number;
-  rewardAmount: number; // mock-calculated in Phase 1
+  rewardAmount: number; // computed backend-side from the period's stream count
   payoutStatus: PayoutStatus;
 }
 
 export interface SubscriptionPrices {
-  silver: number;
-  gold: number;
-}
-
-export interface SubscriptionDistribution {
-  free: number;
   silver: number;
   gold: number;
 }

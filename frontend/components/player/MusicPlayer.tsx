@@ -2,12 +2,12 @@
 
 // frontend/components/player/MusicPlayer.tsx
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMusicPlayer } from "@/context/MusicPlayerContext";
+import { useAuth } from "@/context/AuthContext";
 import { RepeatMode } from "@/types/player";
 import { Song } from "@/types/music";
-import { mockUser } from "@/data/mockHomeData";
 import ProgressBar from "./ProgressBar";
 import QueuePanel from "./QueuePanel";
 import LyricsPanel from "./LyricsPanel";
@@ -16,6 +16,13 @@ function iconBtnClass(active: boolean) {
   return `rounded-full p-1.5 transition ${
     active ? "text-emerald-400" : "text-zinc-400 hover:text-white"
   }`;
+}
+
+// "10 plays" / "1 listener" — pluralized, thousands-separated, 0 as a fallback
+// when the metric hasn't loaded yet.
+function formatStat(count: number | undefined, noun: string): string {
+  const n = count ?? 0;
+  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
 }
 
 function CoverThumb({ song, large = false }: { song: Song; large?: boolean }) {
@@ -63,12 +70,15 @@ function TrackInfo({ song }: { song: Song }) {
       ) : (
         <p className="truncate text-sm font-medium text-white">{song.title}</p>
       )}
-      <Link
-        href={`/artist/${song.artistId}`}
-        className="block truncate text-xs text-zinc-400 hover:text-white hover:underline"
-      >
-        {song.artistName}
-      </Link>
+      <p className="truncate text-xs text-zinc-400">
+        <Link
+          href={`/artist/${song.artistId}`}
+          className="hover:text-white hover:underline"
+        >
+          {song.artistName}
+        </Link>
+        {song.genre ? ` • ${song.genre}` : ""}
+      </p>
     </div>
   );
 }
@@ -147,20 +157,55 @@ export default function MusicPlayer() {
     toggleLyricsPanel,
   } = useMusicPlayer();
 
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+  const desktopBarRef = useRef<HTMLDivElement | null>(null);
+  const mobileBarRef = useRef<HTMLButtonElement | null>(null);
+
+  // Publish the player's height as a CSS variable so page layouts can reserve
+  // matching bottom space and keep their own controls (e.g. the artist upload
+  // page's "Publish Release" button) clickable above the fixed bar. The value
+  // is measured (and re-measured on resize) so it stays correct if the bar
+  // wraps to a taller layout, and reset to 0 whenever no track is loaded.
+  useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => root.style.setProperty("--player-height", "0px");
+    if (!currentSong) {
+      clear();
+      return clear;
+    }
+    const update = () => {
+      const height = Math.max(
+        desktopBarRef.current?.offsetHeight ?? 0,
+        mobileBarRef.current?.offsetHeight ?? 0
+      );
+      root.style.setProperty("--player-height", `${height}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (desktopBarRef.current) observer.observe(desktopBarRef.current);
+    if (mobileBarRef.current) observer.observe(mobileBarRef.current);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      clear();
+    };
+  }, [currentSong]);
 
   // No track loaded yet: render nothing rather than an empty bar.
   if (!currentSong) return null;
 
-  // Phase 1 mock: gold-tier perk shown next to the play count.
-  // Assumes "gold" maps to mockUser.subscription, matching the rest of the
-  // app (home.ts/profile.ts use subscription tiers, not a "gold" role).
-  const isGoldMember = mockUser.subscription === "gold";
+  // Gold-tier perk shown next to the play count, driven by the real session.
+  const isGoldMember = user?.subscription === "gold";
 
   return (
     <>
       {/* Desktop bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 hidden items-center gap-6 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur md:flex">
+      <div
+        ref={desktopBarRef}
+        className="fixed inset-x-0 bottom-0 z-30 hidden items-center gap-6 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur md:flex"
+      >
         <div className="flex w-64 min-w-0 items-center gap-3">
           <CoverThumb song={currentSong} />
           <TrackInfo song={currentSong} />
@@ -203,11 +248,19 @@ export default function MusicPlayer() {
         </div>
 
         <div className="flex w-64 items-center justify-end gap-3">
-          {isGoldMember && (
-            <span className="whitespace-nowrap rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-              GOLD · {currentSong.playsCount.toLocaleString()} plays
-            </span>
-          )}
+          {/* Play count and unique-listener count. Shown to everyone; Gold
+              members keep the amber perk styling. */}
+          <span
+            className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              isGoldMember
+                ? "border border-amber-400/40 bg-amber-400/10 text-amber-300"
+                : "text-zinc-400"
+            }`}
+          >
+            {isGoldMember && "GOLD · "}
+            {formatStat(currentSong.playsCount, "play")} ·{" "}
+            {formatStat(currentSong.listenersCount, "listener")}
+          </span>
 
           <button onClick={toggleLyricsPanel} className="text-xs text-zinc-400 hover:text-white">
             Lyrics
@@ -231,6 +284,7 @@ export default function MusicPlayer() {
 
       {/* Mobile mini-player, sits above the bottom nav bar */}
       <button
+        ref={mobileBarRef}
         onClick={() => setIsExpanded(true)}
         className="fixed inset-x-0 bottom-16 z-30 flex w-full items-center gap-3 border-t border-zinc-800 bg-zinc-950/95 px-3 py-2 text-left backdrop-blur md:hidden"
       >
@@ -269,11 +323,17 @@ export default function MusicPlayer() {
 
             <TrackInfo song={currentSong} />
 
-            {isGoldMember && (
-              <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">
-                GOLD · {currentSong.playsCount.toLocaleString()} plays
-              </span>
-            )}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                isGoldMember
+                  ? "border border-amber-400/40 bg-amber-400/10 text-amber-300"
+                  : "text-zinc-400"
+              }`}
+            >
+              {isGoldMember && "GOLD · "}
+              {formatStat(currentSong.playsCount, "play")} ·{" "}
+              {formatStat(currentSong.listenersCount, "listener")}
+            </span>
 
             <div className="w-full max-w-sm">
               <ProgressBar currentTime={currentTime} duration={duration} onSeek={seek} />

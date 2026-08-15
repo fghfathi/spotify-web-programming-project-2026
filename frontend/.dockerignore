@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+build/
+
+# Local env; the image bakes NEXT_PUBLIC_API_BASE_URL in at build time.
+.env*.local
+
+.git/
+.gitignore
+.DS_Store
+npm-debug.log*
+tsconfig.tsbuildinfo

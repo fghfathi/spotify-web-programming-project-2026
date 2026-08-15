@@ -2,6 +2,8 @@ import { TierDistributionDatum } from "@/types/analytics";
 
 interface TierDistributionChartProps {
   data: TierDistributionDatum[];
+  /** Donut-center total. Computed by the backend report, not summed here. */
+  totalUsers: number;
   title?: string;
   titleFa?: string;
 }
@@ -13,15 +15,16 @@ const GAP_DEG = 2;
 
 // Dependency-free donut chart built from a CSS conic-gradient, following the
 // same "no charting library" convention as the existing SubscriptionPieChart.
-// Fully prop-driven: pass an array of { key, label, labelFa, users, color }.
+// Fully prop-driven: every figure it shows (`users`, `sharePct`, `totalUsers`)
+// arrives precomputed; the only arithmetic here turns a share into wedge
+// degrees, which is layout rather than reporting.
 export default function TierDistributionChart({
   data,
+  totalUsers,
   title = "Subscription Distribution",
   titleFa = "توزیع اشتراک‌ها",
 }: TierDistributionChartProps) {
-  const total = data.reduce((sum, d) => sum + d.users, 0);
-
-  if (total === 0) {
+  if (totalUsers === 0) {
     return (
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 shadow-sm">
         <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500">
@@ -34,12 +37,16 @@ export default function TierDistributionChart({
   // Lay out each wedge, reserving GAP_DEG of empty space after it. The gaps are
   // rendered transparent so the card surface shows through as a thin separator.
   const sweepTotal = 360 - GAP_DEG * data.length;
-  let cursor = 0;
+  // Each wedge begins after the previous wedge plus its trailing gap. Derived
+  // with a scan rather than a running counter, which React Compiler rejects as
+  // render-time mutation.
+  const startShares = data.map((_, index) =>
+    data.slice(0, index).reduce((sum, slice) => sum + slice.sharePct, 0)
+  );
   const stops = data
-    .flatMap((d) => {
-      const start = cursor;
-      const end = start + (d.users / total) * sweepTotal;
-      cursor = end + GAP_DEG;
+    .flatMap((d, index) => {
+      const start = (startShares[index] / 100) * sweepTotal + GAP_DEG * index;
+      const end = start + (d.sharePct / 100) * sweepTotal;
       return [
         `${d.color} ${start}deg ${end}deg`,
         `transparent ${end}deg ${end + GAP_DEG}deg`,
@@ -67,7 +74,7 @@ export default function TierDistributionChart({
           />
           <div className="absolute inset-0 m-auto flex h-24 w-24 flex-col items-center justify-center rounded-full bg-zinc-950 text-center ring-1 ring-white/5">
             <span className="text-lg font-bold tabular-nums text-white">
-              {total.toLocaleString()}
+              {totalUsers.toLocaleString()}
             </span>
             <span className="text-[10px] uppercase tracking-wide text-zinc-400">Users</span>
           </div>
@@ -75,28 +82,25 @@ export default function TierDistributionChart({
 
         {/* Legend doubles as the accessible data table (label + count + share) */}
         <ul className="flex w-full flex-col gap-3 text-sm">
-          {data.map((d) => {
-            const pct = (d.users / total) * 100;
-            return (
-              <li key={d.key} className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className="h-3 w-3 shrink-0 rounded-sm"
-                  style={{ backgroundColor: d.color }}
-                />
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="text-zinc-200">{d.label}</span>
-                  <span className="ml-1.5 text-zinc-500" lang="fa" dir="rtl">
-                    {d.labelFa}
-                  </span>
+          {data.map((d) => (
+            <li key={d.key} className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="h-3 w-3 shrink-0 rounded-sm"
+                style={{ backgroundColor: d.color }}
+              />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="text-zinc-200">{d.label}</span>
+                <span className="ml-1.5 text-zinc-500" lang="fa" dir="rtl">
+                  {d.labelFa}
                 </span>
-                <span className="tabular-nums text-zinc-400">{d.users.toLocaleString()}</span>
-                <span className="w-12 text-right tabular-nums text-zinc-500">
-                  {pct.toFixed(1)}%
-                </span>
-              </li>
-            );
-          })}
+              </span>
+              <span className="tabular-nums text-zinc-400">{d.users.toLocaleString()}</span>
+              <span className="w-12 text-right tabular-nums text-zinc-500">
+                {d.sharePct.toFixed(1)}%
+              </span>
+            </li>
+          ))}
         </ul>
       </div>
     </div>

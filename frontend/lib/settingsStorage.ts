@@ -8,8 +8,15 @@ import { AppSettings, DEFAULT_SETTINGS } from "@/types/settings";
 const SETTINGS_KEY = "shpotify_app_settings";
 
 // Keys that represent a logged-in session across the app. Account deletion
-// clears all of these so the user is fully signed out.
-const SESSION_KEYS = ["shpotify_user", "shpotify_session", "shpotify_auth_token"];
+// clears all of these (including the JWT access/refresh tokens) so the user
+// is fully signed out.
+const SESSION_KEYS = [
+  "shpotify_user",
+  "shpotify_session",
+  "shpotify_auth_token",
+  "shpotify_access",
+  "shpotify_refresh",
+];
 
 export function loadSettings(): AppSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;

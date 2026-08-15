@@ -1,19 +1,18 @@
 import { SubscriptionAnalytics } from "@/types/analytics";
-import { mockSubscriptionAnalytics } from "@/data/mockAnalyticsData";
 import RevenueMetricCards from "@/components/support/RevenueMetricCards";
 import TierDistributionChart from "@/components/support/TierDistributionChart";
 
 interface AnalyticsReportingSectionProps {
-  // Prop-driven: pass your own analytics payload, or omit it to use the central
-  // mock (data/mockAnalyticsData.ts). This keeps the section consistent with the
-  // rest of the Admin panel while staying ready for a real API payload later.
-  analytics?: SubscriptionAnalytics;
+  // The `analytics` block of GET /api/reports/admin/ with tier colors attached
+  // (lib/tierColors.ts). Required — there is deliberately no local fallback, so
+  // every figure in this section can only have come from the backend report.
+  analytics: SubscriptionAnalytics;
 }
 
 // "Analytics & Reporting" dashboard block for the Admin Subscription Settings
 // page. Composes the revenue metric cards and the tier-distribution pie chart.
 export default function AnalyticsReportingSection({
-  analytics = mockSubscriptionAnalytics,
+  analytics,
 }: AnalyticsReportingSectionProps) {
   return (
     <section aria-labelledby="analytics-reporting-heading">
@@ -31,7 +30,10 @@ export default function AnalyticsReportingSection({
 
       <div className="space-y-5">
         <RevenueMetricCards metrics={analytics.metrics} currency={analytics.currency} />
-        <TierDistributionChart data={analytics.distribution} />
+        <TierDistributionChart
+          data={analytics.distribution}
+          totalUsers={analytics.totalUsers}
+        />
       </div>
     </section>
   );

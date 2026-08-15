@@ -1,0 +1,96 @@
+# Shpotify — full stack in one command:
+#
+#     docker compose up --build
+#
+# Then open http://localhost:3000. The backend API is on http://localhost:8000
+# and the Django admin on http://localhost:8000/admin/.
+#
+# The backend seeds demo data on first boot (SEED_DEMO_DATA=1), so the reports
+# and recommendations have something to show immediately. Seeding is idempotent.
+
+name: shpotify
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shpotify}
+      POSTGRES_USER: ${POSTGRES_USER:-shpotify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shpotify}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # The backend waits on this, so it never races the database.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shpotify} -d ${POSTGRES_DB:-shpotify}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-shpotify}:${POSTGRES_PASSWORD:-shpotify}@db:5432/${POSTGRES_DB:-shpotify}
+
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-insecure-key-change-me-in-production}
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
+      # No nginx in front of Django here, so it serves uploaded media itself.
+      SERVE_MEDIA: "1"
+
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      FRONTEND_BASE_URL: http://localhost:3000
+
+      # "simulate" keeps the checkout flow exercisable with no network access.
+      # Set to "sandbox" to hit the real Aqaye Pardakht sandbox.
+      PAYMENT_GATEWAY_MODE: ${PAYMENT_GATEWAY_MODE:-simulate}
+      PAYMENT_GATEWAY_PIN: ${PAYMENT_GATEWAY_PIN:-sandbox}
+      PAYMENT_CALLBACK_URL: http://localhost:8000/api/payments/callback/
+      # Local stand-in gateway page the browser is sent to in "simulate" mode
+      # (same host the browser uses to reach the callback above).
+      PAYMENT_GATEWAY_SIMULATE_URL: http://localhost:8000/api/payments/simulate/
+
+      # Reporting: the one place the artist payout rate is defined.
+      ARTIST_REVENUE_PER_STREAM: ${ARTIST_REVENUE_PER_STREAM:-0.004}
+      PLATFORM_CURRENCY_SYMBOL: ${PLATFORM_CURRENCY_SYMBOL:-$$}
+
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-1}
+      # seed_demo copies real audio/cover art from the frontend's public assets.
+      SEED_MEDIA_DIR: /seed-assets
+    volumes:
+      - media_data:/app/media
+      - ./frontend/public:/seed-assets:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # Every /api/ route requires a JWT and would answer 401, which `curl -f`
+      # treats as failure. The admin login page is the cheapest unauthenticated
+      # 200 that still proves Django booted and the database is reachable.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/admin/login/ -o /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle, so it must be reachable from the
+        # browser on the host — not the internal `backend` hostname.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_data:

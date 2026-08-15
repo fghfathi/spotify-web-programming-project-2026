@@ -1,26 +1,26 @@
-import { SubscriptionDistribution } from "@/types/support";
+import { ReportTierSlice } from "@/types/reports";
 
 interface SubscriptionPieChartProps {
-  distribution: SubscriptionDistribution;
+  /** `analytics.distribution` from GET /api/reports/admin/: counts + shares. */
+  slices: ReportTierSlice[];
+  /** Total user count behind those shares, also from the report. */
+  totalUsers: number;
 }
 
-const TIER_COLORS = {
-  free: "#71717a", // zinc-500
+const TIER_COLORS: Record<ReportTierSlice["key"], string> = {
+  basic: "#71717a", // zinc-500
   silver: "#a1a1aa", // zinc-400
   gold: "#f59e0b", // amber-500
 };
 
-// Minimal dependency-free donut chart built with a CSS conic-gradient, so
-// no charting library needs to be added to the project for this one visual.
-export default function SubscriptionPieChart({ distribution }: SubscriptionPieChartProps) {
-  const total = distribution.free + distribution.silver + distribution.gold;
-  const tiers: Array<{ key: keyof SubscriptionDistribution; label: string }> = [
-    { key: "free", label: "Free" },
-    { key: "silver", label: "Silver" },
-    { key: "gold", label: "Gold" },
-  ];
-
-  if (total === 0) {
+// Minimal dependency-free donut chart built with a CSS conic-gradient, so no
+// charting library needs to be added for this one visual. Counts and shares
+// are supplied by the backend report; only the wedge angles are computed here.
+export default function SubscriptionPieChart({
+  slices,
+  totalUsers,
+}: SubscriptionPieChartProps) {
+  if (totalUsers === 0) {
     return (
       <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-sm text-zinc-500">
         No subscription data to display.
@@ -28,13 +28,16 @@ export default function SubscriptionPieChart({ distribution }: SubscriptionPieCh
     );
   }
 
-  let cumulative = 0;
-  const gradientStops = tiers
-    .map(({ key }) => {
-      const start = (cumulative / total) * 360;
-      cumulative += distribution[key];
-      const end = (cumulative / total) * 360;
-      return `${TIER_COLORS[key]} ${start}deg ${end}deg`;
+  // Each wedge begins where the previous one ended. Derived with a scan rather
+  // than a running counter, which React Compiler rejects as render-time mutation.
+  const startShares = slices.map((_, index) =>
+    slices.slice(0, index).reduce((sum, slice) => sum + slice.sharePct, 0)
+  );
+  const gradientStops = slices
+    .map((slice, index) => {
+      const start = (startShares[index] / 100) * 360;
+      const end = ((startShares[index] + slice.sharePct) / 100) * 360;
+      return `${TIER_COLORS[slice.key]} ${start}deg ${end}deg`;
     })
     .join(", ");
 
@@ -48,16 +51,16 @@ export default function SubscriptionPieChart({ distribution }: SubscriptionPieCh
       />
 
       <ul className="flex flex-col gap-2 text-sm">
-        {tiers.map(({ key, label }) => (
-          <li key={key} className="flex items-center gap-2">
+        {slices.map((slice) => (
+          <li key={slice.key} className="flex items-center gap-2">
             <span
               aria-hidden="true"
               className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: TIER_COLORS[key] }}
+              style={{ backgroundColor: TIER_COLORS[slice.key] }}
             />
-            <span className="text-zinc-300">{label}</span>
+            <span className="text-zinc-300">{slice.label}</span>
             <span className="text-zinc-500">
-              {distribution[key].toLocaleString()} ({((distribution[key] / total) * 100).toFixed(1)}%)
+              {slice.users.toLocaleString()} ({slice.sharePct.toFixed(1)}%)
             </span>
           </li>
         ))}

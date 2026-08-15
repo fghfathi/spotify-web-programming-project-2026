@@ -1,104 +1,144 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { mockSongs, mockAlbums, mockArtists } from "@/data/mockMusicData";
-import { Song, Album, Artist, Playlist } from "@/types/music";
+// Albums & Singles (Browse) page — backed by the API (Bug 1 + Bug 2).
+// Albums, singles and the user's playlists come from the backend; playback is
+// driven by the global music player and playlist membership is persisted via
+// /api/playlists/<id>/tracks/.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Song, Album, Playlist } from "@/types/music";
 import AlbumCard from "@/components/albums/AlbumCard";
 import SingleCard from "@/components/albums/SingleCard";
 import PlaylistSelector from "@/components/albums/PlaylistSelector";
+import RouteGuard from "@/components/shared/RouteGuard";
+import { LoadingState, ErrorState } from "@/components/shared/UIStates";
 import { useMusicPlayer } from "@/context/MusicPlayerContext";
+import { apiGet, apiPost, apiDelete, unwrapList } from "@/lib/api";
+import { ApiSong, toSongs } from "@/lib/mappers";
 
-export default function AlbumsAndSinglesPage() {
-  // Navigation & detailed modal views states
+interface RawAlbum {
+  id: number | string;
+  title: string;
+  artistId: string;
+  artistName: string;
+  releaseDate: string;
+  coverUrl?: string | null;
+  songs: ApiSong[];
+}
+interface RawPlaylist {
+  id: number | string;
+  title: string;
+  trackCount: number;
+  songs: ApiSong[];
+}
+
+function mapAlbum(a: RawAlbum): Album {
+  return {
+    id: String(a.id),
+    title: a.title,
+    artistId: a.artistId,
+    artistName: a.artistName,
+    releaseDate: a.releaseDate,
+    coverUrl: a.coverUrl ?? undefined,
+    songs: toSongs(a.songs),
+  };
+}
+function mapPlaylist(p: RawPlaylist): Playlist {
+  return {
+    id: String(p.id),
+    title: p.title,
+    trackCount: p.trackCount,
+    songs: toSongs(p.songs),
+  };
+}
+
+function AlbumsContent() {
+  const router = useRouter();
+  const { playSong } = useMusicPlayer();
+
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
-  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
-
-  // Search & Filtering states
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<"plays" | "date">("plays");
 
-  // Playback now lives in the global MusicPlayerContext (see app/layout.tsx)
-  // instead of local state, so it persists across navigation and drives
-  // the shared bottom player bar instead of a page-local one.
-  const { playSong } = useMusicPlayer();
-
-  // Playlists fetched from localStorage
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    // Hydrate playlists from localStorage safely on client side
-    const stored = localStorage.getItem("user_playlists");
-    if (stored) {
-      setPlaylists(JSON.parse(stored));
-    }
+  const loadPlaylists = useCallback(async () => {
+    const data = await apiGet<unknown>("/playlists/");
+    setPlaylists(unwrapList<RawPlaylist>(data).map(mapPlaylist));
   }, []);
 
-  // Update localStorage whenever the state changes
-  const savePlaylists = (updated: Playlist[]) => {
-    setPlaylists(updated);
-    localStorage.setItem("user_playlists", JSON.stringify(updated));
-  };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const [albumsRaw, songsRaw] = await Promise.all([
+        apiGet<unknown>("/albums/"),
+        apiGet<unknown>("/songs/"),
+      ]);
+      setAlbums(unwrapList<RawAlbum>(albumsRaw).map(mapAlbum));
+      setSongs(toSongs(unwrapList<ApiSong>(songsRaw)));
+      await loadPlaylists();
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadPlaylists]);
 
-  // Manage playlist songs toggle (add or remove limit-aware)
-  const handleTogglePlaylist = (playlistId: string, song: Song) => {
-    const updated = playlists.map((pl) => {
-      if (pl.id !== playlistId) return pl;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-      const songExists = pl.songs?.some((s) => s.id === song.id);
-      let updatedSongs = pl.songs ? [...pl.songs] : [];
-
-      if (songExists) {
-        updatedSongs = updatedSongs.filter((s) => s.id !== song.id);
+  const handleTogglePlaylist = async (playlistId: string, song: Song) => {
+    const pl = playlists.find((p) => p.id === playlistId);
+    const already = pl?.songs?.some((s) => s.id === song.id);
+    try {
+      if (already) {
+        await apiDelete(`/playlists/${Number(playlistId)}/tracks/${Number(song.id)}/`);
       } else {
-        updatedSongs.push(song);
+        await apiPost(`/playlists/${Number(playlistId)}/tracks/`, {
+          songId: Number(song.id),
+        });
       }
-
-      return {
-        ...pl,
-        songs: updatedSongs,
-        trackCount: updatedSongs.length,
-      };
-    });
-    savePlaylists(updated);
+      await loadPlaylists();
+    } catch {
+      /* ignore — the selector simply won't reflect the change */
+    }
   };
 
-  // Logic to view individual entities
+  const handleArtistClick = (artistId: string) => router.push(`/artist/${artistId}`);
   const handleAlbumClick = (albumId: string) => {
-    const album = mockAlbums.find((a) => a.id === albumId);
+    const album = albums.find((a) => a.id === albumId);
     if (album) setSelectedAlbum(album);
   };
 
-  const handleArtistClick = (artistId: string) => {
-    const artist = mockArtists.find((a) => a.id === artistId);
-    if (artist) setSelectedArtist(artist);
-  };
+  const sortedAlbums = useMemo(() => {
+    const filtered = albums.filter(
+      (a) =>
+        a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.artistName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return [...filtered].sort(
+      (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+    );
+  }, [albums, searchTerm]);
 
-  // Filter and sorting logic
-  const filteredSongs = mockSongs.filter(
-    (song) =>
-      song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      song.artistName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredAlbums = mockAlbums.filter(
-    (album) =>
-      album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      album.artistName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Apply sorting
-  const sortedSongs = [...filteredSongs].sort((a, b) => {
-    if (sortBy === "plays") return b.playsCount - a.playsCount;
-    return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
-  });
-
-  const sortedAlbums = [...filteredAlbums].sort((a, b) => {
-    return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
-  });
-
-  if (!mounted) return null; // Avoid Server-Client hydration mismatch
+  const sortedSongs = useMemo(() => {
+    const filtered = songs.filter(
+      (s) =>
+        s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.artistName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "plays") return b.playsCount - a.playsCount;
+      return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+    });
+  }, [songs, searchTerm, sortBy]);
 
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-10 pb-32">
@@ -107,7 +147,6 @@ export default function AlbumsAndSinglesPage() {
         <p className="text-zinc-400 text-sm">Explore albums, singles, and artists.</p>
       </header>
 
-      {/* Control Bar: Search and Sort */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 mb-8">
         <div className="relative w-full md:w-96">
           <input
@@ -131,55 +170,63 @@ export default function AlbumsAndSinglesPage() {
         </div>
       </div>
 
-      {/* Main Grid display */}
-      <div className="space-y-12">
-        {/* Albums Section */}
-        <section>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <span>Albums</span>
-            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
-              {sortedAlbums.length}
-            </span>
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {sortedAlbums.map((album) => (
-              <AlbumCard
-                key={album.id}
-                album={album}
-                onAlbumClick={handleAlbumClick}
-                onArtistClick={handleArtistClick}
-              />
-            ))}
-          </div>
-        </section>
+      {loading ? (
+        <LoadingState label="Loading the music archive…" />
+      ) : error ? (
+        <ErrorState message="Couldn't load the catalog." onRetry={load} />
+      ) : (
+        <div className="space-y-12">
+          <section>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>Albums</span>
+              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
+                {sortedAlbums.length}
+              </span>
+            </h2>
+            {sortedAlbums.length === 0 ? (
+              <p className="text-sm text-zinc-500">No albums found.</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {sortedAlbums.map((album) => (
+                  <AlbumCard
+                    key={album.id}
+                    album={album}
+                    onAlbumClick={handleAlbumClick}
+                    onArtistClick={handleArtistClick}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-        {/* Singles Section */}
-        <section>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <span>Singles & Tracks</span>
-            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
-              {sortedSongs.length}
-            </span>
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {sortedSongs.map((song) => (
-              <SingleCard
-                key={song.id}
-                song={song}
-                playlists={playlists}
-                // The whole sorted list becomes the queue, so Next/Previous
-                // in the global player walks through what's on screen.
-                onPlay={(sg) => playSong(sg, sortedSongs)}
-                onArtistClick={handleArtistClick}
-                onAlbumClick={handleAlbumClick}
-                onTogglePlaylist={handleTogglePlaylist}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
+          <section>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>Singles & Tracks</span>
+              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
+                {sortedSongs.length}
+              </span>
+            </h2>
+            {sortedSongs.length === 0 ? (
+              <p className="text-sm text-zinc-500">No tracks found.</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {sortedSongs.map((song) => (
+                  <SingleCard
+                    key={song.id}
+                    song={song}
+                    playlists={playlists}
+                    onPlay={(sg) => playSong(sg, sortedSongs)}
+                    onArtistClick={handleArtistClick}
+                    onAlbumClick={handleAlbumClick}
+                    onTogglePlaylist={handleTogglePlaylist}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
-      {/* Dedicated View Modal: Album Details */}
       {selectedAlbum && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -203,8 +250,6 @@ export default function AlbumsAndSinglesPage() {
                   <div
                     key={song.id}
                     onClick={() => {
-                      // Queue the full album tracklist so Next/Previous
-                      // moves through the album in order.
                       playSong(song, selectedAlbum.songs);
                       setSelectedAlbum(null);
                     }}
@@ -213,6 +258,11 @@ export default function AlbumsAndSinglesPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-500 font-mono text-xs">{idx + 1}</span>
                       <span className="text-sm font-semibold text-zinc-200">{song.title}</span>
+                      {song.genre && (
+                        <span className="rounded-full border border-zinc-700 bg-zinc-800/60 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                          {song.genre}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs text-zinc-500">{song.duration}</span>
@@ -229,40 +279,14 @@ export default function AlbumsAndSinglesPage() {
           </div>
         </div>
       )}
-
-      {/* Dedicated View Modal: Artist Profile */}
-      {selectedArtist && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 relative">
-            <button
-              onClick={() => setSelectedArtist(null)}
-              className="absolute right-4 top-4 text-zinc-400 hover:text-white text-lg font-bold"
-            >
-              ✕
-            </button>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center text-xl font-bold text-zinc-500">
-                {selectedArtist.name[0]}
-              </div>
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-green-500 font-bold">Artist Profile</span>
-                <h2 className="text-xl font-bold text-white mt-0.5">{selectedArtist.name}</h2>
-                <p className="text-xs text-zinc-400">{selectedArtist.followersCount.toLocaleString()} Followers</p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-white">About</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed bg-zinc-950 p-4 rounded-lg">
-                {selectedArtist.bio}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* No page-local mini player here anymore — the global MusicPlayer
-          mounted in app/layout.tsx renders the bottom bar for every route,
-          driven by the state we just set with playSong(). */}
     </div>
+  );
+}
+
+export default function AlbumsAndSinglesPage() {
+  return (
+    <RouteGuard>
+      <AlbumsContent />
+    </RouteGuard>
   );
 }

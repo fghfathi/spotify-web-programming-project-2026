@@ -41,9 +41,13 @@ export default function Toggle({
           checked ? "bg-emerald-500" : "bg-zinc-700"
         }`}
       >
+        {/* Track is 44px (w-11); thumb is 20px (w-5) inset 2px (left-0.5/top-0.5)
+            from the left/top. ON translates by 44 − 20 − 2×2 = 20px (translate-x-5),
+            so the thumb spans 22→42px and always stays fully inside the track. */}
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0.5"
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
           }`}
         />
       </button>

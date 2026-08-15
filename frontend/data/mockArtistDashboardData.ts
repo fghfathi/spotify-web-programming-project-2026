@@ -1,11 +1,12 @@
-// Mock data for Phase 1. No backend calls — this file is the single source
-// of truth for the Artist Work Management Panel until the Django API is
-// wired up.
+// Mock data for Phase 1. `ARTIST_GENRES` is still used to populate the upload
+// and edit forms' genre dropdown; the track fixtures below are unused now that
+// the panel reads from the API.
+//
+// The revenue-per-stream rate used to live here and was applied on the client.
+// It now lives in the backend (`ARTIST_REVENUE_PER_STREAM` in settings.py) and
+// reaches the UI only as finished revenue figures on the artist report.
 
 import { ArtistTrack } from "@/types/artistDashboard";
-
-// Revenue payout rate used to estimate earnings from stream counts.
-export const REVENUE_PER_STREAM = 0.004;
 
 export const ARTIST_GENRES: string[] = [
   "Pop",

@@ -1,0 +1,31 @@
+# Core framework — Django 4.2 LTS (compatible with the system Python 3.9).
+Django==4.2.16
+
+# REST API layer.
+djangorestframework==3.15.2
+
+# JWT authentication (access/refresh tokens for the SPA).
+djangorestframework-simplejwt==5.3.1
+
+# Cross-origin access so the Next.js frontend (localhost:3000) can call the API.
+django-cors-headers==4.4.0
+
+# Image handling for ImageField (avatars, covers).
+Pillow==10.4.0
+
+# Load configuration from a .env file.
+python-dotenv==1.0.1
+
+# Server-to-server HTTP calls to the payment gateway (Aqaye Pardakht).
+requests==2.32.3
+
+# --- Deployment (used by the Docker image; harmless locally) ---------------
+# WSGI server the container runs instead of `manage.py runserver`.
+gunicorn==22.0.0
+
+# Serves Django admin static files without a separate nginx container.
+whitenoise==6.7.0
+
+# PostgreSQL driver. Only imported when DATABASE_URL points at Postgres, so a
+# local SQLite run never loads it.
+psycopg2-binary==2.9.9

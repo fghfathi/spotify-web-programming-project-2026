@@ -55,6 +55,7 @@ export default function QueuePanel() {
                   </p>
                   <p className="truncate text-xs text-zinc-500">
                     {song.artistName}
+                    {song.genre ? ` · ${song.genre}` : ""}
                   </p>
                 </button>
 

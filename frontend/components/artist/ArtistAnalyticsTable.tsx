@@ -1,12 +1,17 @@
-import { ArtistTrack } from "@/types/artistDashboard";
-import { REVENUE_PER_STREAM } from "@/data/mockArtistDashboardData";
+import { ArtistTrackReportRow } from "@/types/reports";
 
 interface ArtistAnalyticsTableProps {
-  tracks: ArtistTrack[];
+  /** Rows from GET /api/reports/artist/, already sorted by streams desc. */
+  tracks: ArtistTrackReportRow[];
+  currency?: string;
 }
 
-// Per-track performance breakdown, sorted by streams descending.
-export default function ArtistAnalyticsTable({ tracks }: ArtistAnalyticsTableProps) {
+// Per-track performance breakdown. Streams, unique listeners and revenue all
+// arrive computed from the backend — this table only formats them.
+export default function ArtistAnalyticsTable({
+  tracks,
+  currency = "$",
+}: ArtistAnalyticsTableProps) {
   if (tracks.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-sm text-zinc-500">
@@ -14,8 +19,6 @@ export default function ArtistAnalyticsTable({ tracks }: ArtistAnalyticsTablePro
       </p>
     );
   }
-
-  const sorted = [...tracks].sort((a, b) => b.analytics.streams - a.analytics.streams);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-800">
@@ -31,7 +34,7 @@ export default function ArtistAnalyticsTable({ tracks }: ArtistAnalyticsTablePro
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-800 bg-zinc-900/40">
-          {sorted.map((track) => (
+          {tracks.map((track) => (
             <tr key={track.id} className="transition hover:bg-zinc-800/50">
               <td className="px-4 py-3">
                 <p className="truncate font-medium text-white">{track.title}</p>
@@ -40,15 +43,16 @@ export default function ArtistAnalyticsTable({ tracks }: ArtistAnalyticsTablePro
                 </p>
               </td>
               <td className="px-4 py-3 text-right text-zinc-300">
-                {track.analytics.streams.toLocaleString()}
+                {track.streams.toLocaleString()}
               </td>
               <td className="hidden px-4 py-3 text-right text-zinc-300 sm:table-cell">
-                {track.analytics.uniqueListeners.toLocaleString()}
+                {track.uniqueListeners.toLocaleString()}
               </td>
               <td className="px-4 py-3 text-right font-medium text-emerald-400">
-                {(track.analytics.streams * REVENUE_PER_STREAM).toLocaleString(undefined, {
-                  style: "currency",
-                  currency: "USD",
+                {currency}
+                {track.revenue.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
                 })}
               </td>
             </tr>

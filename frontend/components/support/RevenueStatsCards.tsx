@@ -1,16 +1,26 @@
-import { SubscriptionDistribution } from "@/types/support";
-
 interface RevenueStatsCardsProps {
+  // All three figures arrive aggregated from GET /api/reports/admin/. This card
+  // row used to add up the tier distribution itself to get the totals.
   monthlyRevenue: number;
-  distribution: SubscriptionDistribution;
+  payingUsers: number;
+  totalUsers: number;
+  currency?: string;
 }
 
-export default function RevenueStatsCards({ monthlyRevenue, distribution }: RevenueStatsCardsProps) {
-  const totalUsers = distribution.free + distribution.silver + distribution.gold;
-  const payingUsers = distribution.silver + distribution.gold;
-
+export default function RevenueStatsCards({
+  monthlyRevenue,
+  payingUsers,
+  totalUsers,
+  currency = "$",
+}: RevenueStatsCardsProps) {
   const cards = [
-    { label: "Monthly Subscription Revenue", value: `$${monthlyRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+    {
+      label: "Monthly Subscription Revenue",
+      value: `${currency}${monthlyRevenue.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`,
+    },
     { label: "Paying Subscribers", value: payingUsers.toLocaleString() },
     { label: "Total Users", value: totalUsers.toLocaleString() },
   ];

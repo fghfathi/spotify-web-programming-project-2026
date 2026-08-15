@@ -60,6 +60,12 @@ export default function SingleCard({
               Album: {song.albumName}
             </button>
           )}
+
+          {song.genre && (
+            <span className="mt-1 inline-block rounded-full border border-zinc-700 bg-zinc-800/60 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+              {song.genre}
+            </span>
+          )}
         </div>
       </div>
 
